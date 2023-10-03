@@ -146,6 +146,7 @@ server dhcp4 eth1
 
 addrouter CE1
 int eth1 eth 0000.1111.2222 $3a$ $2b$
+int eth2 eth 0000.1122.2222 $3b$ $8a$
 !
 bridge 10
  description LAN
@@ -233,10 +234,11 @@ object-group network IPv6-MCAST
  sequence 10 ff00:: ff00::
  exit
 access-list IPv4-DENY
- sequence 10 deny all any 698 any 698
- sequence 20 deny 17 any all 255.255.255.255 255.255.255.255 68
- sequence 30 deny all obj IPv4-LL all any all
- sequence 40 deny all any all obj IPv4-MCAST all
+ deny all any 698 any 698
+ deny 17 any all 255.255.255.255 255.255.255.255 68
+ deny 17 any all 255.255.255.255 255.255.255.255 67
+ deny all obj IPv4-LL all any all
+ deny all any all obj IPv4-MCAST all
  exit
 access-list IPv4-NAT
  sequence 10 evaluate deny IPv4-DENY
@@ -349,16 +351,6 @@ interface hairpin92
  no shutdown
  no log-link-change
  exit
-int lo10
- vrf for common
- ipv4 addr 10.8.0.10 255.255.255.0
- bridge-group 10
- exit
-int lo100
- vrf for common
- ipv4 addr 172.16.0.94 255.255.255.0
- bridge-group 100
- exit
 int eth1
  cdp enable
  vrf for common
@@ -366,6 +358,20 @@ int eth1
  ipv4 gateway-prefix p4
  ipv4 dhcp-client enable
  ipv4 dhcp-client early
+ exit
+int eth2
+ cdp enable
+ bridge-group 10
+ exit
+server dhcp4 LAN
+ pool 10.8.0.10 10.8.0.254
+ gateway 10.8.0.1
+ netmask 255.255.255.0
+ dns-server 8.8.8.8
+ domain-name NAT
+ static 0000.6666.2222 10.8.0.10
+ interface hairpin101
+ vrf common
  exit
 ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface eth1
 ipv4 nat common sequence 2000 srclist IPv4-NAT interface eth1
@@ -378,6 +384,25 @@ ipv4 nat common sequence 3113 trgport 17 interface eth1 2133 172.16.0.94 2133
 ipv4 nat common sequence 3200 trgport 6 interface eth1 5001 10.8.0.5 5001
 ipv6 nat common sequence 2000 srclist IPv6-NAT interface eth1
 ipv6 nat common sequence 2000 randomize 49152 65535
+!
+
+addrouter SimulatedHost1
+int eth1 eth 0000.6666.2222 $8a$ $3b$
+!
+vrf def common
+ exit
+prefix-list p4
+ sequence 10 permit 0.0.0.0/0 ge 0 le 0
+ exit
+object-group
+int eth1
+ cdp enable
+ vrf for common
+ ipv4 address dynamic dynamic
+ ipv4 gateway-prefix p4
+ ipv4 dhcp-client enable
+ ipv4 dhcp-client early
+ exit
 !
 
 addrouter PE2
@@ -424,6 +449,7 @@ server dhcp4 eth1
 
 addrouter CE2
 int eth1 eth 0000.2222.2222 $5a$ $4a$
+int eth2 eth 0000.2222.2222 $5b$ $9a$
 !
 bridge 10
  description LAN
@@ -627,16 +653,6 @@ interface hairpin92
  no shutdown
  no log-link-change
  exit
-int lo10
- vrf for common
- ipv4 addr 10.1.0.10 255.255.255.0
- bridge-group 10
- exit
-int lo100
- vrf for common
- ipv4 addr 172.20.0.94 255.255.255.0
- bridge-group 100
- exit
 int eth1
  cdp enable
  vrf for common
@@ -644,6 +660,20 @@ int eth1
  ipv4 gateway-prefix p4
  ipv4 dhcp-client enable
  ipv4 dhcp-client early
+ exit
+int eth2
+ cdp enable
+ bridge-group 10
+ exit
+server dhcp4 LAN
+ pool 10.1.0.10 10.1.0.254
+ gateway 10.1.0.1
+ netmask 255.255.255.0
+ dns-server 8.8.8.8
+ domain-name NAT
+ static 0000.6666.2222 10.1.0.10
+ interface hairpin101
+ vrf common
  exit
 ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface eth1
 ipv4 nat common sequence 2000 srclist IPv4-NAT interface eth1
@@ -657,14 +687,34 @@ ipv4 nat common sequence 3200 trgport 6 interface eth1 5001 10.1.0.5 5001
 ipv6 nat common sequence 2000 srclist IPv6-NAT interface eth1
 ipv6 nat common sequence 2000 randomize 49152 65535
 !
+addrouter SimulatedHost2
+int eth1 eth 0000.6666.2222 $9a$ $5b$
+!
+vrf def common
+ exit
+prefix-list p4
+ sequence 10 permit 0.0.0.0/0 ge 0 le 0
+ exit
+object-group
+int eth1
+ cdp enable
+ vrf for common
+ ipv4 address dynamic dynamic
+ ipv4 gateway-prefix p4
+ ipv4 dhcp-client enable
+ ipv4 dhcp-client early
+ exit
+!
 
 CE1 tping 100 10 100.65.0.1 vrf common sou eth1
-CE1 tping 100 10 100.65.0.1 vrf common sou lo10
-CE1 tping 100 10 100.65.0.1 vrf common sou lo100
 
 CE2 tping 100 10 100.64.0.1 vrf common sou eth1
-CE2 tping 100 10 100.64.0.1 vrf common sou lo10
-CE2 tping 100 10 100.64.0.1 vrf common sou lo100
+
+SimulatedHost1 tping 100 10 100.65.0.1 vrf common
+SimulatedHost1 tping 100 10 100.64.0.1 vrf common
+
+SimulatedHost2 tping 100 10 100.64.0.1 vrf common
+SimulatedHost2 tping 100 10 100.65.0.1 vrf common
 
 P1 output show mpls forw
 PE1 output show mpls forw
