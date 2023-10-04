@@ -31,6 +31,7 @@ int eth2
  mpls ldp4
  exit
 int lo0
+ vrf for common
  ipv4 addr 192.168.255.1 255.255.255.255
  exit
 !
@@ -65,6 +66,7 @@ int eth2
  mpls ldp4
  exit
 int lo0
+ vrf for common
  ipv4 addr 192.168.255.2 255.255.255.255
  exit
 !
@@ -99,6 +101,7 @@ int eth2
  mpls ldp4
  exit
 int lo0
+ vrf for common
  ipv4 addr 192.168.255.3 255.255.255.255
  exit
 !
@@ -130,6 +133,7 @@ int eth2
  mpls ldp4
  exit
 int lo0
+ vrf for common
  ipv4 addr 192.168.254.1 255.255.255.255
  exit
 server dhcp4 eth1
@@ -265,7 +269,6 @@ interface hairpin1001
  vrf forwarding common
  ipv4 address 172.16.0.93 255.255.255.252
  ipv4 pim enable
- router olsr4 1337 enable
  no shutdown
  no log-link-change
  exit
@@ -309,7 +312,6 @@ interface hairpin61
  description L3-IOT
  vrf forwarding common
  ipv4 address 10.8.1.1 255.255.255.0
- router olsr4 1337 enable
  no shutdown
  no log-link-change
  exit
@@ -417,6 +419,7 @@ int eth2
  mpls ldp4
  exit
 int lo0
+ vrf for common
  ipv4 addr 192.168.254.2 255.255.255.255
  exit
 server dhcp4 eth1
@@ -473,12 +476,6 @@ hairpin 6
 hairpin 8
  exit
 hairpin 9
- exit
-router olsr4 1337
- vrf common
- justadvert loopback0
- justadvert hairpin101
- justadvert hairpin201
  exit
 prefix-list p4
  sequence 10 permit 0.0.0.0/0 ge 0 le 0
@@ -556,7 +553,6 @@ interface hairpin1001
  vrf forwarding common
  ipv4 address 172.20.0.93 255.255.255.252
  ipv4 pim enable
- router olsr4 1337 enable
  no shutdown
  no log-link-change
  exit
@@ -600,7 +596,6 @@ interface hairpin61
  description L3-IOT
  vrf forwarding common
  ipv4 address 10.1.1.1 255.255.255.0
- router olsr4 1337 enable
  no shutdown
  no log-link-change
  exit
