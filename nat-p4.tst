@@ -1,41 +1,8 @@
 description nat: test my nat config
 
-addrouter PE1
-int eth1 eth 0000.1111.1111 $1a$ $1b$
-!
-vrf def common
- rd 1:1
- label-mode per-prefix
- exit
-router ospf4 1
- vrf common
- router 192.168.254.1
- area 0 ena
- red conn
- exit
-int eth1
- cdp enable
- vrf for common
- ipv4 addr 100.64.0.1 255.255.255.0
- exit
-int lo0
- vrf for common
- ipv4 addr 192.168.254.1 255.255.255.255
- exit
-server dhcp4 eth1
- pool 100.64.0.10 100.64.0.254
- gateway 100.64.0.1
- netmask 255.255.255.0
- dns-server 8.8.8.8
- domain-name uplink-pe1
- static 0000.0032.2222 100.64.0.105
- interface eth1
- vrf common
- exit
-!
 addrouter CE1
-int eth1 eth 0000.1111.2222 $2a$ $2b$
-int eth2 eth 0000.1111.2222 $3a$ $3b$
+int eth1 eth 0000.0000.1111 $1a$ $1b$
+int eth2 eth 0000.0000.1111 $2b$ $2a$
 !
 vrf def p4lang
  exit
@@ -166,8 +133,6 @@ interface hairpin1002
  exit
 interface hairpin101
  description L3-LAN
- lldp enable
- cdp enable
  vrf forwarding common
  ipv4 address 10.8.0.1 255.255.255.0
  no shutdown
@@ -175,8 +140,6 @@ interface hairpin101
  exit
 interface hairpin102
  description L2-LAN
- lldp enable
- cdp enable
  bridge-group 10
  no shutdown
  no log-link-change
@@ -233,11 +196,6 @@ interface hairpin92
  no shutdown
  no log-link-change
  exit
-int lo10
- vrf for common
- ipv4 addr 10.8.0.10 255.255.255.0
- bridge-group 10
- exit
 int lo100
  vrf for common
  ipv4 addr 172.16.0.94 255.255.255.0
@@ -246,8 +204,10 @@ int lo100
 int eth1
  exit
 int eth2
+ description P4 Interconnect
  exit
 int sdn1
+ macaddr ea97.942d.6ac3
  cdp enable
  no autostate
  vrf for common
@@ -255,6 +215,12 @@ int sdn1
  ipv4 gateway-prefix p4
  ipv4 dhcp-client enable
  ipv4 dhcp-client early
+ exit
+int sdn2
+ macaddr ea97.942b.7ac3
+ cdp enable
+ no autostate
+ bridge-group 20
  exit
 ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface sdn1
 ipv4 nat common sequence 2000 srclist IPv4-NAT interface sdn1
@@ -267,17 +233,83 @@ ipv4 nat common sequence 3113 trgport 17 interface sdn1 2133 172.16.0.94 2133
 ipv4 nat common sequence 3200 trgport 6 interface sdn1 5001 10.8.0.5 5001
 ipv6 nat common sequence 2000 srclist IPv6-NAT interface sdn1
 ipv6 nat common sequence 2000 randomize 49152 65535
+server dhcp4 WLAN
+ pool 10.8.2.10 10.8.2.254
+ gateway 10.8.2.1
+ netmask 255.255.255.0
+ dns-server 8.8.8.8
+ domain-name NAT
+ static 0000.6666.2222 10.8.2.10
+ interface hairpin201
+ vrf common
+ exit
 server p4lang p4
  interconnect eth2
  export-vrf common
+ export-bridge 20
  export-port sdn1 1 10
+ export-port sdn2 2 10
  vrf p4lang
  exit
 !
 addother CE1p4 controller CE1 p4lang 9080 - feature nat
-int eth1 eth 0000.0032.2222 $1b$ $1a$
-int eth2 eth 0000.0032.2222 $2b$ $2a$
-int eth3 eth 0000.0032.2222 $3b$ $3a$
+int eth1 eth 0000.0000.2222 $1b$ $1a$
+int eth2 eth 0000.0000.2222 $2a$ $2b$
+int eth3 eth 0000.0000.2222 $3a$ $3b$
+int eth4 eth 0000.0000.2222 $4a$ $4b$
 !
 !
+addrouter PE1
+int eth1 eth 0000.0000.3333 $3b$ $3a$
+!
+vrf def common
+ rd 1:1
+ label-mode per-prefix
+ exit
+router ospf4 1
+ vrf common
+ router 192.168.254.1
+ area 0 ena
+ red conn
+ exit
+int eth1
+ cdp enable
+ vrf for common
+ ipv4 addr 100.64.0.1 255.255.255.0
+ exit
+int lo0
+ vrf for common
+ ipv4 addr 192.168.254.1 255.255.255.255
+ exit
+server dhcp4 eth1
+ pool 100.64.0.10 100.64.0.254
+ gateway 100.64.0.1
+ netmask 255.255.255.0
+ dns-server 8.8.8.8
+ domain-name uplink-pe1
+ static ea97.942d.6ac3 100.64.0.105
+ interface eth1
+ vrf common
+ exit
+!
+addrouter SimulatedHost1
+int eth1 eth 0000.6666.2222 $4b$ $4a$
+!
+vrf def common
+ exit
+prefix-list p4
+ permit 0.0.0.0/0 ge 0 le 0
+ exit
+object-group
+int eth1
+ cdp enable
+ vrf for common
+ ipv4 address dynamic dynamic
+ ipv4 gateway-prefix p4
+ ipv4 dhcp-client enable
+ ipv4 dhcp-client early
+ exit
+!
+
 CE1 tping 100 10 100.64.0.1 vrf common sou sdn1
+SimulatedHost1 tping 100 10 100.64.0.1 vrf common sou eth1
