@@ -95,7 +95,8 @@ object-group network IPv6-MCAST
  exit
 access-list IPv4-DENY
  deny all any 698 any 698
- deny 17 any all 255.255.255.255 255.255.255.255 68
+ deny 17 any 67 any 68
+ deny 17 any 68 any 67
  deny all obj IPv4-LL all any all
  deny all any all obj IPv4-MCAST all
  exit
@@ -114,7 +115,7 @@ access-list IPv4-NAT-LAN-PERMIT
 access-list IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION
  evaluate deny IPv4-DENY
  deny all obj IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION all obj IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION all
- deny all obj IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION all obj IPv4-PRIVATE-RAGES all log
+ deny all obj IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION all obj IPv4-PRIVATE-RAGES all
  permit all obj IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION all any all
  exit
 access-list IPv6-NAT
@@ -139,6 +140,7 @@ interface hairpin1002
  exit
 interface hairpin101
  description L3-LAN
+ macaddr 0041.636b.3568
  vrf forwarding common
  ipv4 address 10.8.0.1 255.255.255.0
  no shutdown
@@ -208,17 +210,14 @@ interface loopback0
  no shutdown
  no log-link-change
  exit
-int lo100
- vrf for common
- ipv4 addr 172.16.0.94 255.255.255.0
- bridge-group 100
- exit
 int eth1
  exit
 int eth2
  description P4 Interconnect
+ log-link-change
  exit
 int sdn1
+ log-link-change
  macaddr ea97.942d.6ac3
  cdp enable
  no autostate
@@ -248,9 +247,16 @@ int sdn4
  bridge-group 10
  no autostate
  exit
+int sdn5
+ macaddr ea98.942b.9ac5
+ cdp enable
+ bridge-group 100
+ no autostate
+ exit
 ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface sdn1
 ipv4 nat common sequence 2000 srclist IPv4-NAT interface sdn1
-ipv4 nat common sequence 2000 randomize 49152 65535
+ipv4 nat common sequence 2000 randomize 16384 32767
+ipv4 nat common sequence 2000 log-translations
 ipv4 nat common sequence 3100 trgport 17 interface sdn1 5132 172.16.0.94 5132
 ipv4 nat common sequence 3110 trgport 6 interface sdn1 2132 172.16.0.94 2132
 ipv4 nat common sequence 3111 trgport 17 interface sdn1 2132 172.16.0.94 2132
@@ -258,15 +264,18 @@ ipv4 nat common sequence 3112 trgport 6 interface sdn1 2133 172.16.0.94 2133
 ipv4 nat common sequence 3113 trgport 17 interface sdn1 2133 172.16.0.94 2133
 ipv4 nat common sequence 3200 trgport 6 interface sdn1 5001 10.8.0.5 5001
 ipv6 nat common sequence 2000 srclist IPv6-NAT interface sdn1
-ipv6 nat common sequence 2000 randomize 49152 65535
+ipv6 nat common sequence 2000 randomize 16384 32767
 server p4lang p4
  interconnect eth2
  export-vrf common
  export-bridge 20
+ export-bridge 100
+ export-bridge 10
  export-port sdn1 1 10
  export-port sdn2 2 10
  export-port sdn3 3 10
  export-port sdn4 4 10
+ export-port sdn5 5 10
  export-port hairpin1002 dynamic 0 0 0 0
  export-port hairpin202 dynamic 0 0 0 0
  export-port hairpin201 dynamic 0 0 0 0
@@ -666,6 +675,28 @@ server prometheus prom
  vrf common
  exit
 client name-server 10.8.254.7
+event-manager FIXING-NAT
+ event .* 0041.636b.3568 learned from hairpin102
+ tcl exec "test logging debug MODIFY ACL IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION"
+ tcl config "access-list IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION" "permit all any all any all"
+ tcl exec "test logging debug REMOVE NAT SEQ 1000"
+ tcl config "no ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface sdn1"
+ tcl exec "test logging debug STARTING SLEEP FOR 2 SEC"
+ tcl after "2000"
+ tcl exec "test logging debug FINISHING SLEEP FOR 2 SEC"
+ tcl exec "test logging debug READDING NAT SEQ1000"
+ tcl config "ipv4 nat common sequence 1000 srclist IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION interface sdn1"
+ tcl exec "test logging debug STARTING SLEEP FOR 1 SEC"
+ tcl after "1000"
+ tcl exec "test logging debug FINISHING SLEEP FOR 1 SEC"
+ tcl exec "test logging debug MODIFY ACL IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION AGAIN"
+ tcl exec "test logging debug STARTING SLEEP FOR 1 SEC"
+ tcl after "1000"
+ tcl exec "test logging debug FINISHING SLEEP FOR 1 SEC"
+ tcl config "access-list IPv4-NAT-WITHOUT-SOURCE-PORT-RANDOMISATION" "no sequence 50 permit all any all any all"
+ tcl exec "clear ipv4 nat common"
+ tcl exec "test logging debug WORKAROUND DONE"
+ exit
 !
 addother CE1p4 controller CE1 p4lang 9080 - feature nat
 int eth1 eth 0000.0000.2222 $1b$ $1a$
@@ -674,6 +705,7 @@ int eth3 eth 0000.0000.2222 $3a$ $3b$
 int eth4 eth 0000.0000.2222 $4a$ $4b$
 int eth5 eth 0000.0000.2222 $5a$ $5b$
 int eth6 eth 0000.0000.2222 $6a$ $6b$
+int eth7 eth 0000.0000.2222 $7a$ $7b$
 !
 !
 addrouter PE1
@@ -762,7 +794,21 @@ int eth1
  ipv4 dhcp-client early
  exit
 !
+addrouter SimulatedHost4
+int eth1 eth 0000.6666.4444 $7b$ $7a$
+!
+vrf def common
+ exit
+int eth1
+ cdp enable
+ vrf for common
+ ipv4 address 172.16.0.94 255.255.255.252
+ exit
+ipv4 route common 0.0.0.0 0.0.0.0 172.16.0.93
+!
 CE1 tping 100 10 100.64.0.1 vrf common sou sdn1
+SimulatedHost4 tping 100 10 172.16.0.93 vrf common sou eth1
+SimulatedHost4 tping 100 10 100.64.0.1 vrf common sou eth1
 SimulatedHost3 tping 100 10 100.64.0.1 vrf common sou eth1
 SimulatedHost2 tping 100 10 100.64.0.1 vrf common sou eth1.20
 SimulatedHost1 tping 100 10 100.64.0.1 vrf common sou eth1
